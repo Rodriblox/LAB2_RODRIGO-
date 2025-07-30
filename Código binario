@@ -3,16 +3,21 @@
 const int ledPins[4] = {23, 22, 16, 4};
 const int botonSuma = 17;
 const int botonResta = 19;
+const int botonModo = 21; // Tercer botón para cambiar de modo
 
-int contador = 0; // Ahora de 0 a 4 (5 estados)
+int contador = 0;
+int modo = 0; // 0 = Modo 1 (carrusel), 1 = Modo 2 (binario)
 
 unsigned long tiempoAnteriorSuma = 0;
 unsigned long tiempoAnteriorResta = 0;
+unsigned long tiempoAnteriorModo = 0;
 const unsigned long debounceDelay = 100;
 
 bool estadoAnteriorSuma = HIGH;
 bool estadoAnteriorResta = HIGH;
+bool estadoAnteriorModo = HIGH;
 
+// --- Parte 1: Carrusel con apagado ---
 void mostrarLedUnico(int indice) {
   if (indice >= 0 && indice < 4) {
     for (int i = 0; i < 4; i++) {
@@ -28,6 +33,15 @@ void mostrarLedUnico(int indice) {
   }
 }
 
+// --- Parte 2: Binario ---
+void mostrarNumero(int numero) {
+  for (int i = 0; i < 4; i++) {
+    digitalWrite(ledPins[i], (numero >> i) & 1);
+  }
+  Serial.print("Contador: ");
+  Serial.println(numero);
+}
+
 void setup() {
   for (int i = 0; i < 4; i++) {
     pinMode(ledPins[i], OUTPUT);
@@ -35,41 +49,98 @@ void setup() {
   }
   pinMode(botonSuma, INPUT_PULLUP);
   pinMode(botonResta, INPUT_PULLUP);
+  pinMode(botonModo, INPUT_PULLUP);
   Serial.begin(115200);
   delay(500);
-  mostrarLedUnico(contador);
+  mostrarLedUnico(contador); // Inicia en modo 1
 }
 
 void loop() {
   bool estadoActualSuma = digitalRead(botonSuma);
   bool estadoActualResta = digitalRead(botonResta);
+  bool estadoActualModo = digitalRead(botonModo);
   unsigned long tiempoActual = millis();
 
-  // Antirrebote botón suma
-  if (estadoAnteriorSuma == HIGH && estadoActualSuma == LOW) {
-    if ((tiempoActual - tiempoAnteriorSuma) > debounceDelay) {
-      contador = (contador + 1) % 5; // Ahora 5 estados (0-4)
-      Serial.println("Boton Suma PRESIONADO");
-      mostrarLedUnico(contador);
+  // --- Cambio de modo ---
+  if (estadoAnteriorModo == HIGH && estadoActualModo == LOW) {
+    if ((tiempoActual - tiempoAnteriorModo) > debounceDelay) {
+      modo = !modo; // Cambia entre 0 y 1
+      Serial.print("Cambiando a modo: ");
+      Serial.println(modo == 0 ? "CARRUSEL" : "BINARIO");
+      // Reinicia el contador y muestra el estado inicial del nuevo modo
+      contador = 0;
+      if (modo == 0) {
+        mostrarLedUnico(contador);
+      } else {
+        mostrarNumero(contador);
+      }
+      tiempoAnteriorModo = tiempoActual;
+    }
+  }
+  if (estadoAnteriorModo != estadoActualModo) {
+    tiempoAnteriorModo = tiempoActual;
+  }
+  estadoAnteriorModo = estadoActualModo;
+
+  // --- Modo 1: Carrusel con apagado ---
+  if (modo == 0) {
+    // Antirrebote botón suma
+    if (estadoAnteriorSuma == HIGH && estadoActualSuma == LOW) {
+      if ((tiempoActual - tiempoAnteriorSuma) > debounceDelay) {
+        contador = (contador + 1) % 5; // 0-3: LED, 4: apagado
+        Serial.println("Boton Suma PRESIONADO");
+        mostrarLedUnico(contador);
+        tiempoAnteriorSuma = tiempoActual;
+      }
+    }
+    if (estadoAnteriorSuma != estadoActualSuma) {
       tiempoAnteriorSuma = tiempoActual;
     }
-  }
-  if (estadoAnteriorSuma != estadoActualSuma) {
-    tiempoAnteriorSuma = tiempoActual;
-  }
-  estadoAnteriorSuma = estadoActualSuma;
+    estadoAnteriorSuma = estadoActualSuma;
 
-  // Antirrebote botón resta
-  if (estadoAnteriorResta == HIGH && estadoActualResta == LOW) {
-    if ((tiempoActual - tiempoAnteriorResta) > debounceDelay) {
-      contador = (contador - 1 + 5) % 5; // Ahora 5 estados (0-4)
-      Serial.println("Boton Resta PRESIONADO");
-      mostrarLedUnico(contador);
+    // Antirrebote botón resta
+    if (estadoAnteriorResta == HIGH && estadoActualResta == LOW) {
+      if ((tiempoActual - tiempoAnteriorResta) > debounceDelay) {
+        contador = (contador - 1 + 5) % 5;
+        Serial.println("Boton Resta PRESIONADO");
+        mostrarLedUnico(contador);
+        tiempoAnteriorResta = tiempoActual;
+      }
+    }
+    if (estadoAnteriorResta != estadoActualResta) {
       tiempoAnteriorResta = tiempoActual;
     }
+    estadoAnteriorResta = estadoActualResta;
   }
-  if (estadoAnteriorResta != estadoActualResta) {
-    tiempoAnteriorResta = tiempoActual;
+
+  // --- Modo 2: Binario ---
+  else {
+    // Antirrebote botón suma
+    if (estadoAnteriorSuma == HIGH && estadoActualSuma == LOW) {
+      if ((tiempoActual - tiempoAnteriorSuma) > debounceDelay) {
+        contador = (contador + 1) % 10; // 0-9 en binario
+        Serial.println("Boton Suma PRESIONADO");
+        mostrarNumero(contador);
+        tiempoAnteriorSuma = tiempoActual;
+      }
+    }
+    if (estadoAnteriorSuma != estadoActualSuma) {
+      tiempoAnteriorSuma = tiempoActual;
+    }
+    estadoAnteriorSuma = estadoActualSuma;
+
+    // Antirrebote botón resta
+    if (estadoAnteriorResta == HIGH && estadoActualResta == LOW) {
+      if ((tiempoActual - tiempoAnteriorResta) > debounceDelay) {
+        contador = (contador - 1 + 10) % 10;
+        Serial.println("Boton Resta PRESIONADO");
+        mostrarNumero(contador);
+        tiempoAnteriorResta = tiempoActual;
+      }
+    }
+    if (estadoAnteriorResta != estadoActualResta) {
+      tiempoAnteriorResta = tiempoActual;
+    }
+    estadoAnteriorResta = estadoActualResta;
   }
-  estadoAnteriorResta = estadoActualResta;
 }
